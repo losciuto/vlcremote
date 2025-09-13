@@ -1,4 +1,4 @@
-[![License](https://img.shields.io/github/license/italia/bootstrap-italia.svg)](https://github.com/losciuto/vclremote/tree/master?tab=GPL-3.0-1-ov-file)
+[![License](https://img.shields.io/github/license/italia/bootstrap-italia.svg)](https://github.com/losciuto/vclremote/blob/master/LICENSE)
 # Gestione remota di VLC.
 > in collaborazione con DeepSeek e chatGPT5.
 
