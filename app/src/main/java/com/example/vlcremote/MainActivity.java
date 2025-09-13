@@ -4,20 +4,23 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Bundle;
 import android.os.Handler;
+import android.text.InputType;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
@@ -27,6 +30,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -50,14 +59,20 @@ public class MainActivity extends AppCompatActivity {
     private final Handler uiHandler = new Handler();
 
     // Cambia qui IP e porta VLC
-    private final String VLC_IP = "192.168.1.15";
-    private final int VLC_PORT = 8000;
+    private String VLC_IP = "192.168.1.15";
+    private int VLC_PORT = 8000;
+
+    // Aggiungi costante per il file di configurazione
+    private static final String CONFIG_FILE = "vlc_config.txt";
+
+    Button btnInfo, btnSettings;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
+        // Carica le impostazioni salvate all'avvio
+        loadSettings();
         scheduler = Executors.newSingleThreadScheduledExecutor();
 
         // bind UI
@@ -73,6 +88,8 @@ public class MainActivity extends AppCompatActivity {
         btnVolDown = findViewById(R.id.btnVolDown);
         btnFullscreen = findViewById(R.id.btnFullscreen);
         btnRefreshPlaylist = findViewById(R.id.btnRefreshPlaylist);
+        btnInfo = findViewById(R.id.btnInfo);
+        btnSettings = findViewById(R.id.btnSettings);
         seekBar = findViewById(R.id.seekBar);
         playlistView = findViewById(R.id.playlistView);
 
@@ -119,10 +136,12 @@ public class MainActivity extends AppCompatActivity {
         btnStop.setOnClickListener(v -> sendCommand("stop"));
         btnPrev.setOnClickListener(v -> sendCommand("prev"));
         btnNext.setOnClickListener(v -> sendCommand("next"));
-        btnVolUp.setOnClickListener(v -> sendCommand("volup 5"));
-        btnVolDown.setOnClickListener(v -> sendCommand("voldown 5"));
+        btnVolUp.setOnClickListener(v -> sendCommand("volup 3"));
+        btnVolDown.setOnClickListener(v -> sendCommand("voldown 3"));
         btnFullscreen.setOnClickListener(v -> sendCommand("fullscreen"));
         btnRefreshPlaylist.setOnClickListener(v -> updatePlaylist());
+        btnInfo.setOnClickListener(v -> showInfoDialog());
+        btnSettings.setOnClickListener(v -> showSettingsDialog());
 
         seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
@@ -180,7 +199,130 @@ public class MainActivity extends AppCompatActivity {
         btnVolDown.setEnabled(enabled);
         btnFullscreen.setEnabled(enabled);
         btnRefreshPlaylist.setEnabled(enabled);
+        btnInfo.setEnabled(true); // Il pulsante info è sempre abilitato
+        btnSettings.setEnabled(true); //Il pulsante impostazioni è sempre abilitato
         seekBar.setEnabled(enabled);
+    }
+
+
+    // Aggiungi questo metodo per mostrare le informazioni
+    private void showInfoDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Informazioni su VLC Remote");
+        builder.setMessage("vlcremote App\n\n" +
+                "Sviluppato da: losciuto\n" +
+                "Versione: 1.0 del settembre 2025\n\n" +
+                "Un'app per controllare VLC Media Player\n" +
+                "da dispositivo Android tramite rete.");
+        builder.setPositiveButton("OK", null);
+        builder.show();
+    }
+
+    // Aggiungi questo metodo per mostrare le impostazioni
+    // Modifica il metodo showSettingsDialog per salvare le impostazioni
+    private void showSettingsDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Impostazioni Server VLC");
+
+        // Crea un layout per la finestra di dialogo
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(50, 40, 50, 10);
+
+        // Campo per l'IP
+        TextView ipLabel = new TextView(this);
+        ipLabel.setText("Indirizzo IP:");
+        ipLabel.setTextColor(Color.WHITE);
+        ipLabel.setTextSize(16);
+        layout.addView(ipLabel);
+
+        final EditText ipInput = new EditText(this);
+        ipInput.setInputType(InputType.TYPE_CLASS_TEXT);
+        ipInput.setText(VLC_IP);
+        ipInput.setTextColor(Color.BLACK);
+        ipInput.setHint("Inserisci l'IP del server VLC");
+        ipInput.setHintTextColor(Color.GRAY);
+        layout.addView(ipInput);
+
+        // Campo per la porta
+        TextView portLabel = new TextView(this);
+        portLabel.setText("Porta:");
+        portLabel.setTextColor(Color.WHITE);
+        portLabel.setTextSize(16);
+        portLabel.setPadding(0, 30, 0, 0);
+        layout.addView(portLabel);
+
+        final EditText portInput = new EditText(this);
+        portInput.setInputType(InputType.TYPE_CLASS_NUMBER);
+        portInput.setText(String.valueOf(VLC_PORT));
+        portInput.setTextColor(Color.BLACK);
+        portInput.setHint("Inserisci la porta");
+        portInput.setHintTextColor(Color.GRAY);
+        layout.addView(portInput);
+
+        builder.setView(layout);
+
+        // Pulsanti
+        builder.setPositiveButton("Salva", (dialog, which) -> {
+            String newIp = ipInput.getText().toString().trim();
+            String newPort = portInput.getText().toString().trim();
+
+            if (!newIp.isEmpty() && !newPort.isEmpty()) {
+                VLC_IP = newIp;
+                try {
+                    VLC_PORT = Integer.parseInt(newPort);
+                    // Salva le nuove impostazioni
+                    saveSettings();
+                    // Riconnetti con le nuove impostazioni
+                    reconnectWithNewSettings();
+                } catch (NumberFormatException e) {
+                    Toast.makeText(MainActivity.this, "Porta non valida", Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+
+        builder.setNegativeButton("Annulla", null);
+
+        // Mostra i valori attuali come suggerimento
+        builder.setNeutralButton("Ripristina Default", (dialog, which) -> {
+            VLC_IP = "192.168.1.15";
+            VLC_PORT = 8000;
+            // Salva i valori di default
+            saveSettings();
+            reconnectWithNewSettings();
+        });
+
+        AlertDialog dialog = builder.create();
+        dialog.show();
+
+        // Personalizza i colori dei pulsanti
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(Color.parseColor("#4CAF50"));
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(Color.parseColor("#F44336"));
+        dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setTextColor(Color.parseColor("#2196F3"));
+    }
+
+    // Metodo per riconnettersi con le nuove impostazioni
+    private void reconnectWithNewSettings() {
+        // Disconnetti prima se connesso
+        if (isConnected) {
+            try {
+                isConnected = false;
+                if (writer != null) writer.close();
+                if (reader != null) reader.close();
+                if (socket != null && !socket.isClosed()) socket.close();
+            } catch (Exception ignored) {}
+        }
+
+        // Riconnetti con le nuove impostazioni
+        runOnUiThread(() -> {
+            Toast.makeText(MainActivity.this, "Connessione a " + VLC_IP + ":" + VLC_PORT, Toast.LENGTH_SHORT).show();
+            setButtonsEnabled(false);
+            txtNowPlaying.setText("Connessione in corso...");
+            playlistItems.clear();
+            playlistAdapter.notifyDataSetChanged();
+        });
+
+        connectToVlc();
     }
 
     // --- COMUNICAZIONE SINCRONIZZATA ---
@@ -315,6 +457,50 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // --- UTILS ---
+    private void saveSettings() {
+        try {
+            FileOutputStream fos = openFileOutput(CONFIG_FILE, MODE_PRIVATE);
+            OutputStreamWriter osw = new OutputStreamWriter(fos);
+            osw.write(VLC_IP + "\n");
+            osw.write(VLC_PORT + "\n");
+            osw.close();
+            fos.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void loadSettings() {
+        try {
+            File file = new File(getFilesDir(), CONFIG_FILE);
+            if (file.exists()) {
+                FileInputStream fis = openFileInput(CONFIG_FILE);
+                BufferedReader br = new BufferedReader(new InputStreamReader(fis));
+                String ip = br.readLine();
+                String port = br.readLine();
+                br.close();
+                fis.close();
+
+                if (ip != null && !ip.trim().isEmpty()) {
+                    VLC_IP = ip.trim();
+                }
+                if (port != null && !port.trim().isEmpty()) {
+                    try {
+                        VLC_PORT = Integer.parseInt(port.trim());
+                    } catch (NumberFormatException e) {
+                        // Mantieni il valore default se la porta non è valida
+                        VLC_PORT = 8000;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            // In caso di errore, mantieni i valori di default
+            VLC_IP = "192.168.1.15";
+            VLC_PORT = 8000;
+        }
+    }
+
     private String cleanPlaylistItem(String item) {
         String cleaned = item.replace("|>", "")
                 .replace("| ", "")
