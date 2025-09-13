@@ -210,7 +210,7 @@ public class MainActivity extends AppCompatActivity {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Informazioni su VLC Remote");
         builder.setMessage("vlcremote App\n\n" +
-                "Sviluppato da: losciuto\n" +
+                "Sviluppato da: 'losciuto'\n" +
                 "Versione: 1.0 del settembre 2025\n\n" +
                 "Un'app per controllare VLC Media Player\n" +
                 "da dispositivo Android tramite rete.");
